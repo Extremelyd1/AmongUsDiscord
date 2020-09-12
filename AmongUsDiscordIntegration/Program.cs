@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace AmongUsDiscordIntegration {
     public class Program {
+        private static readonly string AMONG_US_PROCESS_NAME = "Among Us";
+        
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
 
@@ -27,7 +30,10 @@ namespace AmongUsDiscordIntegration {
             _isMuted = false;
             _isDeafened = false;
 
+            _gameState = GameState.MENU;
             _inMeeting = false;
+            _isDead = false;
+            _newDeath = false;
 
             _lastPlayerAliveState = new Dictionary<string, bool>();
         }
@@ -65,16 +71,25 @@ namespace AmongUsDiscordIntegration {
                     counter = 0;
                 }
                 
-                System.Threading.Thread.Sleep(500);
+                Thread.Sleep(500);
                 
-                found = Mem.OpenProcess("Among Us");
+                found = Mem.OpenProcess(AMONG_US_PROCESS_NAME);
             }
-            
-            Console.WriteLine("\nAmong Us Process found, starting program loop...");
+
+            Console.WriteLine("\n");
+
+            for (var i = 10; i > 0; i--) {
+                Console.Write($"\rAmong Us Process found, starting program loop in {i}...");
+                Thread.Sleep(1000);
+            }
+
+            Console.WriteLine("\rAmong Us Process found, starting program loop now...");
+
+            Mem.OpenProcess(AMONG_US_PROCESS_NAME);
 
             Methods.Init();
             
-            var proc = Process.GetProcessesByName("Among Us")[0];
+            var proc = Process.GetProcessesByName(AMONG_US_PROCESS_NAME)[0];
             ProcessMemory = new ProcessMemory(proc);
             ProcessMemory.Open(ProcessAccess.AllAccess);
             
@@ -82,12 +97,54 @@ namespace AmongUsDiscordIntegration {
         }
 
         private void Start() {
-            while (true) {
+            while (CheckProcess()) {
                 CheckState();
                 CheckPlayers();
                 CheckMeeting();
 
-                System.Threading.Thread.Sleep(100);
+                Thread.Sleep(100);
+            }
+            
+            Console.WriteLine("Among Us process closed, exiting...");
+        }
+
+        private bool CheckProcess() {
+            return Mem.GetProcIdFromName(AMONG_US_PROCESS_NAME) != 0;
+        }
+        
+        private void CheckState() {
+            if (!GetAmongUsClient(out var amongUsClient)) {
+                return;
+            }
+
+            var newState = (GameState) amongUsClient.GameState;
+
+            if (!_gameState.Equals(newState)) {
+                Console.WriteLine($"State changed to {newState.ToString()}");
+
+                if (newState.Equals(GameState.END_SCREEN)) {
+                    Console.WriteLine("Game has ended!");
+
+                    if (_isDeafened || _isMuted) {
+                        ToggleMute();
+                    }
+                }
+
+                if (_gameState.Equals(GameState.LOBBY) && newState.Equals(GameState.IN_GAME)) {
+                    Console.WriteLine("Game has started!");
+
+                    _isDead = false;
+                    _newDeath = false;
+
+                    List<string> playerNames = new List<string>();
+                    foreach (var playerData in GetAllPlayers()) {
+                        playerNames.Add(Utils.ReadString(playerData.PlayerInfo.Value.PlayerName));
+                    }
+
+                    ToggleDeafen();
+                }
+                
+                _gameState = newState;
             }
         }
 
@@ -144,10 +201,6 @@ namespace AmongUsDiscordIntegration {
                 _lastPlayerAliveState.Remove(playerName);
 
                 Console.WriteLine($"Player {playerName} has left the game");
-
-                if (_gameState.Equals(GameState.IN_GAME)) {
-                    //_httpClient.SendPlayerDeathRequest(playerName);
-                }
             }
         }
 
@@ -163,7 +216,6 @@ namespace AmongUsDiscordIntegration {
                     } else {
                         ToggleDeafen();
                     }
-                    //_httpClient.SendMeetingEndRequest();
                 }
                 
                 return;
@@ -174,58 +226,20 @@ namespace AmongUsDiscordIntegration {
 
                 _inMeeting = true;
 
-                if (!_isDead || _newDeath) {
-                    ToggleDeafen();
-                    ToggleMute();
+                if (_isDead) {
+                    if (_newDeath) {
+                        ToggleDeafen();
 
-                    _newDeath = false;
+                        _newDeath = false;
+                    }
+
+                    ToggleMute();
                 } else {
-                    ToggleMute();
-                }
-
-                //_httpClient.SendMeetingCalledRequest();
-            }
-        }
-
-        private void CheckState() {
-            if (!GetAmongUsClient(out var amongUsClient)) {
-                return;
-            }
-
-            var newState = (GameState) amongUsClient.GameState;
-
-            if (!_gameState.Equals(newState)) {
-                Console.WriteLine($"State changed to {newState.ToString()}");
-
-                if (newState.Equals(GameState.END_SCREEN)) {
-                    Console.WriteLine("Game has ended!");
-
-                    if (_isDeafened || _isMuted) {
-                        ToggleMute();
-                    }
-
-                    //_httpClient.SendEndRequest();
-                }
-
-                if (_gameState.Equals(GameState.LOBBY) && newState.Equals(GameState.IN_GAME)) {
-                    Console.WriteLine("Game has started!");
-
-                    _isDead = false;
-                    _newDeath = false;
-
-                    List<string> playerNames = new List<string>();
-                    foreach (var playerData in GetAllPlayers()) {
-                        playerNames.Add(Utils.ReadString(playerData.PlayerInfo.Value.PlayerName));
-                    }
-
                     ToggleDeafen();
-                    //_httpClient.SendStartRequest(playerNames);
                 }
-                
-                _gameState = newState;
             }
         }
-        
+
         private List<PlayerData> GetAllPlayers() {
             var datas = new List<PlayerData>();
 

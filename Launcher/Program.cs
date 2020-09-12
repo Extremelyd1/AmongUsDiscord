@@ -15,36 +15,63 @@ namespace Launcher {
 
         private static readonly string AMONG_US_PATH = "\\steamapps\\common\\Among Us\\";
         
-        private static readonly string DISCORD_EXECUTABLE_NAME = "AmongUsDiscord.exe";
+        private static readonly string DISCORD_EXECUTABLE_NAME = "AmongUsDiscordIntegration.exe";
         
         private static readonly string AMONG_US_EXECUTABLE_NAME = "Among Us.exe";
 
+        private bool _dev;
+
         public static void Main(string[] args) {
-            new Program().Init();
+            if (args.Length < 1) {
+                new Program(false).Init();
+
+                return;
+            }
+
+            if (args[0].Equals("dev")) {
+                new Program(true).Init();
+            }
         }
 
-        private Program() {
+        private Program(bool dev) {
+            _dev = dev;
         }
 
         private void Init() {
+            if (_dev) {
+                Console.WriteLine("Launched in dev mode");
+            }
+
+            Console.WriteLine("Finding steam directory path...");
+            
             string steamDirectoryPath = GetSteamDirectoryPath();
+            
+            Console.WriteLine("Checking for updates...");
             
             string latestReleaseUrl = GetLatestReleaseUrl();
             
             string filePath = steamDirectoryPath + AMONG_US_PATH;
-            
-            // Check whether discord integration file already exists
-            if (File.Exists(filePath + DISCORD_EXECUTABLE_NAME)) {
-                File.Delete(filePath + DISCORD_EXECUTABLE_NAME);
+
+            if (!_dev) {
+                // Check whether discord integration file already exists
+                if (File.Exists(filePath + DISCORD_EXECUTABLE_NAME)) {
+                    File.Delete(filePath + DISCORD_EXECUTABLE_NAME);
+                }
+
+                DownloadIntegration(latestReleaseUrl, filePath + DISCORD_EXECUTABLE_NAME);
             }
-            
-            DownloadIntegration(latestReleaseUrl, filePath + DISCORD_EXECUTABLE_NAME);
+
+            Console.WriteLine("Launching game...");
             
             // Launch Among Us
             Process.Start(filePath + AMONG_US_EXECUTABLE_NAME);
             
+            Console.WriteLine("Launching discord integration...");
+            
             // Launch Among Us Discord
             Process.Start(filePath + DISCORD_EXECUTABLE_NAME);
+
+            Console.WriteLine("Exiting...");
         }
 
         private string GetLatestReleaseUrl() {
