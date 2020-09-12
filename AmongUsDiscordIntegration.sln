@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AmongUsDiscordIntegration", "AmongUsDiscordIntegration\AmongUsDiscordIntegration.csproj", "{5044BDA7-E21D-44CE-94AE-742E1B9C0C25}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Launcher", "Launcher\Launcher.csproj", "{2B20787C-B496-4D99-B2A2-430201FBC292}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{5044BDA7-E21D-44CE-94AE-742E1B9C0C25}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5044BDA7-E21D-44CE-94AE-742E1B9C0C25}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5044BDA7-E21D-44CE-94AE-742E1B9C0C25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B20787C-B496-4D99-B2A2-430201FBC292}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2B20787C-B496-4D99-B2A2-430201FBC292}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2B20787C-B496-4D99-B2A2-430201FBC292}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2B20787C-B496-4D99-B2A2-430201FBC292}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

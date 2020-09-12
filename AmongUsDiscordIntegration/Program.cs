@@ -4,23 +4,28 @@ using System.Diagnostics;
 
 namespace AmongUsDiscordIntegration {
     public class Program {
-        private static readonly string IP = "192.168.2.200";
-        private static readonly string PORT = "7919";
-        
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
 
-        private HttpClient _httpClient;
+        private Keyboard _keyboard;
+
+        private bool _isMuted;
+        private bool _isDeafened;
         
         private GameState _gameState;
         private bool _inMeeting;
+        private bool _isDead;
+        private bool _newDeath;
 
         private readonly Dictionary<string, bool> _lastPlayerAliveState;
 
         public Program() {
             Mem = new Memory();
+            
+            _keyboard = new Keyboard();
 
-            _httpClient = new HttpClient(IP, PORT);
+            _isMuted = false;
+            _isDeafened = false;
 
             _inMeeting = false;
 
@@ -87,6 +92,10 @@ namespace AmongUsDiscordIntegration {
         }
 
         private void CheckPlayers() {
+            if (!_gameState.Equals(GameState.IN_GAME)) {
+                return;
+            }
+            
             var checkedPlayers = new List<string>();
             
             foreach (var playerData in GetAllPlayers()) {
@@ -108,9 +117,12 @@ namespace AmongUsDiscordIntegration {
                 if (currentState != lastState) {
                         
                     if (currentState) {
-                        Console.WriteLine($"Player {playerName} has died");
+                        //Console.WriteLine($"Player {playerName} has died");
 
-                        _httpClient.SendPlayerDeathRequest(playerName);
+                        if (playerData.IsLocalPlayer) {
+                            _isDead = true;
+                            _newDeath = true;
+                        }
                     } else {
                         Console.WriteLine($"Player {playerName} has revived");
                     }
@@ -134,7 +146,7 @@ namespace AmongUsDiscordIntegration {
                 Console.WriteLine($"Player {playerName} has left the game");
 
                 if (_gameState.Equals(GameState.IN_GAME)) {
-                    _httpClient.SendPlayerDeathRequest(playerName);
+                    //_httpClient.SendPlayerDeathRequest(playerName);
                 }
             }
         }
@@ -146,7 +158,12 @@ namespace AmongUsDiscordIntegration {
 
                     _inMeeting = false;
 
-                    _httpClient.SendMeetingEndRequest();
+                    if (_isDead) {
+                        ToggleMute();
+                    } else {
+                        ToggleDeafen();
+                    }
+                    //_httpClient.SendMeetingEndRequest();
                 }
                 
                 return;
@@ -157,7 +174,16 @@ namespace AmongUsDiscordIntegration {
 
                 _inMeeting = true;
 
-                _httpClient.SendMeetingCalledRequest();
+                if (!_isDead || _newDeath) {
+                    ToggleDeafen();
+                    ToggleMute();
+
+                    _newDeath = false;
+                } else {
+                    ToggleMute();
+                }
+
+                //_httpClient.SendMeetingCalledRequest();
             }
         }
 
@@ -173,19 +199,27 @@ namespace AmongUsDiscordIntegration {
 
                 if (newState.Equals(GameState.END_SCREEN)) {
                     Console.WriteLine("Game has ended!");
-                    
-                    _httpClient.SendEndRequest();
+
+                    if (_isDeafened || _isMuted) {
+                        ToggleMute();
+                    }
+
+                    //_httpClient.SendEndRequest();
                 }
 
                 if (_gameState.Equals(GameState.LOBBY) && newState.Equals(GameState.IN_GAME)) {
                     Console.WriteLine("Game has started!");
 
+                    _isDead = false;
+                    _newDeath = false;
+
                     List<string> playerNames = new List<string>();
                     foreach (var playerData in GetAllPlayers()) {
                         playerNames.Add(Utils.ReadString(playerData.PlayerInfo.Value.PlayerName));
                     }
-                    
-                    _httpClient.SendStartRequest(playerNames);
+
+                    ToggleDeafen();
+                    //_httpClient.SendStartRequest(playerNames);
                 }
                 
                 _gameState = newState;
@@ -286,6 +320,33 @@ namespace AmongUsDiscordIntegration {
             
             meetingHud = Utils.FromBytes<MeetingHud>(meetingHudBytes);
             return true;
+        }
+
+        private void ToggleMute() {
+            _keyboard.SendDown(Keyboard.Input.CONTROL);
+            _keyboard.SendDown(Keyboard.Input.F1);
+
+            _keyboard.SendUp(Keyboard.Input.F1);
+            _keyboard.SendUp(Keyboard.Input.CONTROL);
+
+            if (_isDeafened) {
+                _isDeafened = false;
+                _isMuted = false;
+            } else if (_isMuted) {
+                _isMuted = false;
+            } else {
+                _isMuted = true;
+            }
+        }
+
+        private void ToggleDeafen() {
+            _keyboard.SendDown(Keyboard.Input.CONTROL);
+            _keyboard.SendDown(Keyboard.Input.F2);
+            
+            _keyboard.SendUp(Keyboard.Input.F2);
+            _keyboard.SendUp(Keyboard.Input.CONTROL);
+
+            _isDeafened = !_isDeafened;
         }
 
         private enum GameState {
