@@ -5,12 +5,20 @@ using System.Threading;
 
 namespace AmongUsDiscordIntegration {
     public class Program {
-        private static readonly string AMONG_US_PROCESS_NAME = "Among Us";
-        
+        private const string AmongUsProcessName = "Among Us";
+        // private const string Ip = "192.168.2.200";
+        // private const string Port = "7919";
+        private const string Ip = "localhost";
+        private const string Port = "12345";
+
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
 
-        private Keyboard _keyboard;
+        private readonly bool _useHttp;
+
+        private readonly HttpClient _httpClient;
+
+        private readonly Keyboard _keyboard;
 
         private bool _isMuted;
         private bool _isDeafened;
@@ -22,7 +30,13 @@ namespace AmongUsDiscordIntegration {
 
         private readonly Dictionary<string, bool> _lastPlayerAliveState;
 
-        public Program() {
+        public Program(bool useHttp) {
+            _useHttp = useHttp;
+
+            if (_useHttp) {
+                _httpClient = new HttpClient(Ip, Port);
+            }
+            
             Mem = new Memory();
             
             _keyboard = new Keyboard();
@@ -39,6 +53,10 @@ namespace AmongUsDiscordIntegration {
         }
         
         public void Init() {
+            if (_useHttp) {
+                Console.WriteLine("Running in HTTP mode");
+            }
+            
             Console.WriteLine("Initializing program...");
 
             FindProcess();
@@ -73,7 +91,7 @@ namespace AmongUsDiscordIntegration {
                 
                 Thread.Sleep(500);
                 
-                found = Mem.OpenProcess(AMONG_US_PROCESS_NAME);
+                found = Mem.OpenProcess(AmongUsProcessName);
             }
 
             Console.WriteLine("\n");
@@ -85,11 +103,11 @@ namespace AmongUsDiscordIntegration {
 
             Console.WriteLine("\rAmong Us Process found, starting program loop now...");
 
-            Mem.OpenProcess(AMONG_US_PROCESS_NAME);
+            Mem.OpenProcess(AmongUsProcessName);
 
             Methods.Init();
             
-            var proc = Process.GetProcessesByName(AMONG_US_PROCESS_NAME)[0];
+            var proc = Process.GetProcessesByName(AmongUsProcessName)[0];
             ProcessMemory = new ProcessMemory(proc);
             ProcessMemory.Open(ProcessAccess.AllAccess);
             
@@ -109,7 +127,7 @@ namespace AmongUsDiscordIntegration {
         }
 
         private bool CheckProcess() {
-            return Mem.GetProcIdFromName(AMONG_US_PROCESS_NAME) != 0;
+            return Mem.GetProcIdFromName(AmongUsProcessName) != 0;
         }
         
         private void CheckState() {
@@ -125,7 +143,9 @@ namespace AmongUsDiscordIntegration {
                 if (newState.Equals(GameState.END_SCREEN)) {
                     Console.WriteLine("Game has ended!");
 
-                    if (_isDeafened || _isMuted) {
+                    if (_useHttp) {
+                        _httpClient.SendEndRequest();
+                    } else if (_isDeafened || _isMuted) {
                         ToggleMute();
                     }
                 }
@@ -141,7 +161,11 @@ namespace AmongUsDiscordIntegration {
                         playerNames.Add(Utils.ReadString(playerData.PlayerInfo.Value.PlayerName));
                     }
 
-                    ToggleDeafen();
+                    if (_useHttp) {
+                        _httpClient.SendStartRequest(playerNames);
+                    } else {
+                        ToggleDeafen();
+                    }
                 }
                 
                 _gameState = newState;
@@ -174,9 +198,11 @@ namespace AmongUsDiscordIntegration {
                 if (currentState != lastState) {
                         
                     if (currentState) {
-                        //Console.WriteLine($"Player {playerName} has died");
-
-                        if (playerData.IsLocalPlayer) {
+                        if (_useHttp) {
+                            Console.WriteLine($"Player {playerName} has died");
+                            
+                            _httpClient.SendPlayerDeathRequest(playerName);
+                        } else if (playerData.IsLocalPlayer) {
                             _isDead = true;
                             _newDeath = true;
                         }
@@ -201,6 +227,10 @@ namespace AmongUsDiscordIntegration {
                 _lastPlayerAliveState.Remove(playerName);
 
                 Console.WriteLine($"Player {playerName} has left the game");
+
+                if (_useHttp) {
+                    _httpClient.SendPlayerDeathRequest(playerName);
+                }
             }
         }
 
@@ -211,7 +241,9 @@ namespace AmongUsDiscordIntegration {
 
                     _inMeeting = false;
 
-                    if (_isDead) {
+                    if (_useHttp) {
+                        _httpClient.SendMeetingEndRequest();
+                    } else if (_isDead) {
                         ToggleMute();
                     } else {
                         ToggleDeafen();
@@ -226,7 +258,9 @@ namespace AmongUsDiscordIntegration {
 
                 _inMeeting = true;
 
-                if (_isDead) {
+                if (_useHttp) {
+                    _httpClient.SendMeetingCalledRequest();
+                } else if (_isDead) {
                     if (_newDeath) {
                         ToggleDeafen();
 
