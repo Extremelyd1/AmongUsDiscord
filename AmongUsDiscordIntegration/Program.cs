@@ -6,10 +6,10 @@ using System.Threading;
 namespace AmongUsDiscordIntegration {
     public class Program {
         private const string AmongUsProcessName = "Among Us";
-        // private const string Ip = "192.168.2.200";
-        // private const string Port = "7919";
-        private const string Ip = "localhost";
-        private const string Port = "12345";
+        private const string Ip = "192.168.2.200";
+        private const string Port = "7919";
+
+        private const int MeetingEndWaitTime = 7500;
 
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
@@ -167,6 +167,16 @@ namespace AmongUsDiscordIntegration {
                         ToggleDeafen();
                     }
                 }
+
+                if (newState.Equals(GameState.LOBBY) || newState.Equals(GameState.MENU)) {
+                    _inMeeting = false;
+                    _isDead = false;
+                    _newDeath = false;
+                    
+                    if (_isDeafened || _isMuted) {
+                        ToggleMute();
+                    }
+                }
                 
                 _gameState = newState;
             }
@@ -203,11 +213,11 @@ namespace AmongUsDiscordIntegration {
                             
                             _httpClient.SendPlayerDeathRequest(playerName);
                         } else if (playerData.IsLocalPlayer) {
+                            Console.WriteLine($"Player {playerName} has died");
+                            
                             _isDead = true;
                             _newDeath = true;
                         }
-                    } else {
-                        Console.WriteLine($"Player {playerName} has revived");
                     }
                         
                     _lastPlayerAliveState.Remove(playerName);
@@ -241,6 +251,9 @@ namespace AmongUsDiscordIntegration {
 
                     _inMeeting = false;
 
+                    // Wait a bit before muting to account for the vote result text
+                    Thread.Sleep(MeetingEndWaitTime);
+                    
                     if (_useHttp) {
                         _httpClient.SendMeetingEndRequest();
                     } else if (_isDead) {
