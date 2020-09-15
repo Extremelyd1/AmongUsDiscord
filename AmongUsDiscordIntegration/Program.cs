@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Threading;
 
@@ -138,9 +139,9 @@ namespace AmongUsDiscordIntegration {
             if (!GetAmongUsClient(out var amongUsClient)) {
                 return;
             }
-
+            
             var newState = (GameState) amongUsClient.GameState;
-
+            
             if (!_gameState.Equals(newState)) {
                 Console.WriteLine($"State changed to {newState.ToString()}");
 
@@ -221,8 +222,8 @@ namespace AmongUsDiscordIntegration {
                             Console.WriteLine($"Player {playerName} has died");
                             
                             _isDead = true;
-                            _newDeath = true;
-
+                            _newDeath = !_votedOff;
+                            
                             if (_votedOff) {
                                 _votedOff = false;
                             }
@@ -254,7 +255,7 @@ namespace AmongUsDiscordIntegration {
         }
 
         private void CheckMeeting() {
-            if (!GetMeetingHud(out var meetingHud) || meetingHud.state == 4) {
+            if (!GetMeetingHud(out var meetingHud) || meetingHud.Equals(null) || !meetingHud.DespawnOnDestroy) {
                 if (_inMeeting && _gameState.Equals(GameState.IN_GAME)) {
                     Console.WriteLine("Meeting Ended!");
 
@@ -281,7 +282,7 @@ namespace AmongUsDiscordIntegration {
                 return;
             }
 
-            if (!_inMeeting  && meetingHud.state == 0 && _gameState.Equals(GameState.IN_GAME)) {
+            if (!_inMeeting  && (meetingHud.state == 0 || meetingHud.state == 1) && _gameState.Equals(GameState.IN_GAME)) {
                 Console.WriteLine("Meeting Called!");
 
                 _inMeeting = true;
@@ -300,10 +301,15 @@ namespace AmongUsDiscordIntegration {
                     ToggleDeafen();
                 }
             }
-
+            
             if (meetingHud.state == 3 && meetingHud.exiledPlayer != IntPtr.Zero && !_votedOff) {
-                var exiledPlayer = ((int) meetingHud.exiledPlayer).ToString("X");
+                var localPlayer = GetLocalPLayer();
+                if (localPlayer == null) {
+                    return;
+                }
 
+                var exiledPlayer = ((int) meetingHud.exiledPlayer).ToString("X");
+                
                 var playerInfoBytes = Mem.ReadBytes(exiledPlayer, Utils.SizeOf<PlayerInfo>());
                 if (playerInfoBytes != null && playerInfoBytes.Length != 0) {
                     var playerInfo = Utils.FromBytes<PlayerInfo>(playerInfoBytes);

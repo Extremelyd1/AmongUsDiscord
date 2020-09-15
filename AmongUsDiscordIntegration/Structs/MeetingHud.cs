@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Explicit)]
 public struct MeetingHud {
+    [FieldOffset(32)] public bool DespawnOnDestroy;
     [FieldOffset(36)] public IntPtr ButtonParent;
     [FieldOffset(40)] public IntPtr TitleText;
     [FieldOffset(44)] public IntPtr VoteOrigin;
