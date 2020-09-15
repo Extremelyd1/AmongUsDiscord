@@ -1,1 +1,1 @@
-https://extremelyd1.github.io/AmongUsDiscord/latest.exe?raw=true
+https://github.com/Extremelyd1/AmongUsDiscord/releases/download/v1.2/AmongUsDiscordIntegration.exe
