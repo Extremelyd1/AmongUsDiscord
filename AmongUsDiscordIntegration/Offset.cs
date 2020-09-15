@@ -9,7 +9,7 @@
         public static string ShipStatus_Pointer = "GameAssembly.dll+00DA04CC";
         public static string[] ShipStatus_Offsets = {"5C", "0", "8", "18", "0"};
 
-        public static string MeetingHud_Pointer = "GameAssembly.dll+00DA58D0";
-        public static string[] MeetingHud_Offsets = {"5C", "0", "8", "94", "18", "0"};
+        public static string MeetingHud_Pointer = "GameAssembly.dll+DA58D0";
+        public static string[] MeetingHud_Offsets = {"5C", "0", "0"};
     }
 }

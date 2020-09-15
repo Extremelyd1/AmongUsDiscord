@@ -9,7 +9,7 @@ namespace AmongUsDiscordIntegration {
         private const string Ip = "192.168.2.200";
         private const string Port = "7919";
 
-        private const int MeetingEndWaitTime = 7500;
+        private const int MeetingEndWaitTime = 7000;
 
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
@@ -27,6 +27,8 @@ namespace AmongUsDiscordIntegration {
         private bool _inMeeting;
         private bool _isDead;
         private bool _newDeath;
+
+        private bool _votedOff;
 
         private readonly Dictionary<string, bool> _lastPlayerAliveState;
 
@@ -48,6 +50,8 @@ namespace AmongUsDiscordIntegration {
             _inMeeting = false;
             _isDead = false;
             _newDeath = false;
+
+            _votedOff = false;
 
             _lastPlayerAliveState = new Dictionary<string, bool>();
         }
@@ -172,6 +176,7 @@ namespace AmongUsDiscordIntegration {
                     _inMeeting = false;
                     _isDead = false;
                     _newDeath = false;
+                    _votedOff = false;
                     
                     if (_isDeafened || _isMuted) {
                         ToggleMute();
@@ -217,6 +222,10 @@ namespace AmongUsDiscordIntegration {
                             
                             _isDead = true;
                             _newDeath = true;
+
+                            if (_votedOff) {
+                                _votedOff = false;
+                            }
                         }
                     }
                         
@@ -245,7 +254,7 @@ namespace AmongUsDiscordIntegration {
         }
 
         private void CheckMeeting() {
-            if (!GetMeetingHud(out _)) {
+            if (!GetMeetingHud(out var meetingHud) || meetingHud.state == 4) {
                 if (_inMeeting && _gameState.Equals(GameState.IN_GAME)) {
                     Console.WriteLine("Meeting Ended!");
 
@@ -257,16 +266,22 @@ namespace AmongUsDiscordIntegration {
                     if (_useHttp) {
                         _httpClient.SendMeetingEndRequest();
                     } else if (_isDead) {
-                        ToggleMute();
+                        if (_isMuted) {
+                            ToggleMute();
+                        }
                     } else {
-                        ToggleDeafen();
+                        if (!_votedOff) {
+                            ToggleDeafen();
+                        } else {
+                            Console.WriteLine("Local player was voted off, not deafening");
+                        }
                     }
                 }
                 
                 return;
             }
 
-            if (!_inMeeting && _gameState.Equals(GameState.IN_GAME)) {
+            if (!_inMeeting  && meetingHud.state == 0 && _gameState.Equals(GameState.IN_GAME)) {
                 Console.WriteLine("Meeting Called!");
 
                 _inMeeting = true;
@@ -283,6 +298,20 @@ namespace AmongUsDiscordIntegration {
                     ToggleMute();
                 } else {
                     ToggleDeafen();
+                }
+            }
+
+            if (meetingHud.state == 3 && meetingHud.exiledPlayer != IntPtr.Zero && !_votedOff) {
+                var exiledPlayer = ((int) meetingHud.exiledPlayer).ToString("X");
+
+                var playerInfoBytes = Mem.ReadBytes(exiledPlayer, Utils.SizeOf<PlayerInfo>());
+                if (playerInfoBytes != null && playerInfoBytes.Length != 0) {
+                    var playerInfo = Utils.FromBytes<PlayerInfo>(playerInfoBytes);
+
+                    if (GetLocalPLayer().Instance.PlayerId == playerInfo.PlayerId) {
+                        // Local player was exiled (voted-off)
+                        _votedOff = true;
+                    }
                 }
             }
         }
@@ -324,6 +353,16 @@ namespace AmongUsDiscordIntegration {
             }
             
             return datas;
+        }
+
+        private PlayerData GetLocalPLayer() {
+            foreach (PlayerData playerData in GetAllPlayers()) {
+                if (playerData.IsLocalPlayer) {
+                    return playerData;
+                }
+            }
+
+            return null;
         }
 
         private bool GetAmongUsClient(out AmongUsClient client) {
