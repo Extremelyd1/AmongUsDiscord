@@ -3,101 +3,120 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace AmongUsDiscordIntegration
-{
-    public static class Utils
-    {
-        static Dictionary<(Type, string), int> _offsetMap = new Dictionary<(Type, string), int>();
+namespace AmongUsDiscordIntegration {
+    public static class Utils {
+        private static readonly Dictionary<(Type, string), int> OffsetMap = new Dictionary<(Type, string), int>();
 
-        public static T FromBytes<T>(byte[] bytes)
-        {
-            GCHandle gcHandle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
-            var data = (T)Marshal.PtrToStructure(gcHandle.AddrOfPinnedObject(), typeof(T));
+        public static T FromBytes<T>(byte[] bytes) {
+            var gcHandle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+            var data = (T) Marshal.PtrToStructure(gcHandle.AddrOfPinnedObject(), typeof(T));
             gcHandle.Free();
             return data;
         }
 
-        public static int SizeOf<T>()
-        {
-            var size = Marshal.SizeOf(typeof(T));
-            return size;
+        public static int SizeOf<T>() {
+            return Marshal.SizeOf(typeof(T));
         }
 
 
-        public static string GetAddress(this long value) { return value.ToString("X"); }
-        public static string GetAddress(this int value) { return value.ToString("X"); }
-        public static string GetAddress(this uint value) { return value.ToString("X"); }
-        public static string GetAddress(this IntPtr value) { return value.ToInt32().GetAddress(); }
-        public static string GetAddress(this UIntPtr value) { return value.ToUInt32().GetAddress(); }
+        public static string GetAddress(this long value) {
+            return value.ToString("X");
+        }
 
-        public static IntPtr Sum(this IntPtr ptr, IntPtr ptr2) { return (IntPtr)(ptr.ToInt32() + ptr2.ToInt32()); }
-        public static IntPtr Sum(this IntPtr ptr, UIntPtr ptr2) { return (IntPtr)(ptr.ToInt32() + (int)ptr2.ToUInt32()); }
-        public static IntPtr Sum(this UIntPtr ptr, IntPtr ptr2) { return (IntPtr)(ptr.ToUInt32() + ptr2.ToInt32()); }
-        public static IntPtr Sum(this int ptr, IntPtr ptr2) { return (IntPtr)(ptr + ptr2.ToInt32()); }
-        public static IntPtr Sum(this IntPtr ptr, int ptr2) { return (IntPtr)(ptr.ToInt32() + ptr2); }
+        public static string GetAddress(this int value) {
+            return value.ToString("X");
+        }
 
-        public static IntPtr GetMemberPointer(IntPtr basePtr, Type type, string fieldName)
-        {
-            var offset = GetOffset(type, fieldName); 
+        public static string GetAddress(this uint value) {
+            return value.ToString("X");
+        }
+
+        public static string GetAddress(this IntPtr value) {
+            return value.ToInt32().GetAddress();
+        }
+
+        public static string GetAddress(this UIntPtr value) {
+            return value.ToUInt32().GetAddress();
+        }
+
+        public static IntPtr Sum(this IntPtr ptr, IntPtr ptr2) {
+            return (IntPtr) (ptr.ToInt32() + ptr2.ToInt32());
+        }
+
+        public static IntPtr Sum(this IntPtr ptr, UIntPtr ptr2) {
+            return (IntPtr) (ptr.ToInt32() + (int) ptr2.ToUInt32());
+        }
+
+        public static IntPtr Sum(this UIntPtr ptr, IntPtr ptr2) {
+            return (IntPtr) (ptr.ToUInt32() + ptr2.ToInt32());
+        }
+
+        public static IntPtr Sum(this int ptr, IntPtr ptr2) {
+            return (IntPtr) (ptr + ptr2.ToInt32());
+        }
+
+        public static IntPtr Sum(this IntPtr ptr, int ptr2) {
+            return (IntPtr) (ptr.ToInt32() + ptr2);
+        }
+
+        public static IntPtr GetMemberPointer(IntPtr basePtr, Type type, string fieldName) {
+            var offset = GetOffset(type, fieldName);
             return basePtr.Sum(offset);
         }
-        public static int GetOffset(Type type, string fieldName)
-        {
-            if (_offsetMap.ContainsKey((type, fieldName)))
-            {
-                return _offsetMap[(type, fieldName)];
+
+        public static int GetOffset(Type type, string fieldName) {
+            if (OffsetMap.ContainsKey((type, fieldName))) {
+                return OffsetMap[(type, fieldName)];
             }
+
             var field = type.GetField(fieldName);
-            var atts = field.GetCustomAttributes(true);
-            foreach (var att in atts)
-            {
-                if (att.GetType() == typeof(FieldOffsetAttribute))
-                {
-                    _offsetMap.Add((type, fieldName), (att as FieldOffsetAttribute).Value);
-                    return (att as FieldOffsetAttribute).Value;
+            var attributes = field.GetCustomAttributes(true);
+            foreach (var attr in attributes) {
+                if (attr is FieldOffsetAttribute attribute) {
+                    OffsetMap.Add((type, fieldName), attribute.Value);
+                    return attribute.Value;
                 }
             }
 
             return -1;
         }
 
-        public static string ReadString(IntPtr offset)
-        {
-            //string pointer + 8 = length
+        public static string ReadString(IntPtr offset) {
+            // string pointer + 8 = length
             var length = Program.Mem.ReadInt(offset.Sum(8).GetAddress());
 
-            //unit of string is 2byte.
-            var format_length = length * 2;
+            // unit of string is 2byte.
+            var formatLength = length * 2;
 
-            //string pointer + 12 = value
-            var strByte = Program.Mem.ReadBytes(offset.Sum(12).GetAddress(), format_length); 
+            // string pointer + 12 = value
+            var strByte = Program.Mem.ReadBytes(offset.Sum(12).GetAddress(), formatLength);
 
-            StringBuilder sb = new StringBuilder(); 
-            for (int i = 0; i < strByte.Length; i += 2)
-            {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < strByte.Length; i += 2) {
                 // english = 1byte
-                if (strByte[i + 1] == 0) 
-                    sb.Append((char)strByte[i]); 
-                // korean & unicode = 2byte
-                else
-                    sb.Append(System.Text.Encoding.Unicode.GetString(new byte[] { strByte[i], strByte[i + 1] }));
+                if (strByte[i + 1] == 0) {
+                    sb.Append((char) strByte[i]);
+                } else {
+                    // korean & unicode = 2byte
+                    sb.Append(Encoding.Unicode.GetString(new[] {strByte[i], strByte[i + 1]}));
+                }
             }
 
             return sb.ToString();
         }
 
         public static string GetPointerAddress(string baseAddress, string[] offsets) {
-            byte[] currentReadBytes = Program.Mem.ReadBytes(baseAddress, 4);
+            var currentReadBytes = Program.Mem.ReadBytes(baseAddress, 4);
 
             if (currentReadBytes == null || currentReadBytes.Length == 0) {
                 return null;
             }
 
             for (var i = 0; i < offsets.Length; i++) {
-                string offsetAddress = "";
+                var offsetAddress = "";
 
-                foreach (var _byte in currentReadBytes) {
-                    offsetAddress = _byte.ToString("X2") + offsetAddress;
+                foreach (var readByte in currentReadBytes) {
+                    offsetAddress = readByte.ToString("X2") + offsetAddress;
                 }
 
                 if (i == offsets.Length - 1) {
@@ -107,7 +126,7 @@ namespace AmongUsDiscordIntegration
                 offsetAddress = offsetAddress + "+" + offsets[i];
 
                 currentReadBytes = Program.Mem.ReadBytes(offsetAddress, 4);
-                
+
                 if (currentReadBytes == null || currentReadBytes.Length == 0) {
                     return null;
                 }
@@ -115,10 +134,5 @@ namespace AmongUsDiscordIntegration
 
             return "";
         }
-
-        public static double Distance(Vector2 pos1, Vector2 pos2) {
-            return Math.Sqrt(Math.Pow(pos2.x - pos1.x, 2) + Math.Pow(pos2.y - pos1.y, 2));
-        }
-
     }
 }

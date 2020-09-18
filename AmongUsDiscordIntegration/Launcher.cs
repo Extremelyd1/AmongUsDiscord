@@ -1,5 +1,5 @@
 ﻿namespace AmongUsDiscordIntegration {
-    internal class Launcher {
+    internal static class Launcher {
         public static void Main(string[] args) {
             if (args.Length < 1) {
                 new Program(false).Init();

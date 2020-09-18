@@ -61,11 +61,16 @@ namespace Launcher {
                 DownloadIntegration(latestReleaseUrl, filePath + DISCORD_EXECUTABLE_NAME);
             }
 
-            Console.WriteLine("Launching game...");
-            
-            // Launch Among Us
-            Process.Start(filePath + AMONG_US_EXECUTABLE_NAME);
-            
+            // Check if game is not running yet
+            if (Process.GetProcessesByName("Among Us").Length == 0) {
+                Console.WriteLine("Launching game...");
+
+                // Launch Among Us
+                Process.Start(filePath + AMONG_US_EXECUTABLE_NAME);
+            } else {
+                Console.WriteLine("Game is already running...");
+            }
+
             Console.WriteLine("Launching discord integration...");
             
             // Launch Among Us Discord

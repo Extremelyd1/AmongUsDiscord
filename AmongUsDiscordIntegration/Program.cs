@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Threading;
 
@@ -11,6 +10,7 @@ namespace AmongUsDiscordIntegration {
         private const string Port = "7919";
 
         private const int MeetingEndWaitTime = 7000;
+        private const int OverlapWaitTime = 1000;
 
         public static Memory Mem;
         public static ProcessMemory ProcessMemory;
@@ -47,7 +47,7 @@ namespace AmongUsDiscordIntegration {
             _isMuted = false;
             _isDeafened = false;
 
-            _gameState = GameState.MENU;
+            _gameState = GameState.Menu;
             _inMeeting = false;
             _isDead = false;
             _newDeath = false;
@@ -145,7 +145,7 @@ namespace AmongUsDiscordIntegration {
             if (!_gameState.Equals(newState)) {
                 Console.WriteLine($"State changed to {newState.ToString()}");
 
-                if (newState.Equals(GameState.END_SCREEN)) {
+                if (newState.Equals(GameState.EndScreen)) {
                     Console.WriteLine("Game has ended!");
 
                     if (_useHttp) {
@@ -155,7 +155,7 @@ namespace AmongUsDiscordIntegration {
                     }
                 }
 
-                if (_gameState.Equals(GameState.LOBBY) && newState.Equals(GameState.IN_GAME)) {
+                if (_gameState.Equals(GameState.Lobby) && newState.Equals(GameState.InGame)) {
                     Console.WriteLine("Game has started!");
 
                     _isDead = false;
@@ -163,7 +163,7 @@ namespace AmongUsDiscordIntegration {
 
                     List<string> playerNames = new List<string>();
                     foreach (var playerData in GetAllPlayers()) {
-                        playerNames.Add(Utils.ReadString(playerData.PlayerInfo.Value.PlayerName));
+                        playerNames.Add(Utils.ReadString(playerData.PlayerInfo.PlayerName));
                     }
 
                     if (_useHttp) {
@@ -173,7 +173,7 @@ namespace AmongUsDiscordIntegration {
                     }
                 }
 
-                if (newState.Equals(GameState.LOBBY) || newState.Equals(GameState.MENU)) {
+                if (newState.Equals(GameState.Lobby) || newState.Equals(GameState.Menu)) {
                     _inMeeting = false;
                     _isDead = false;
                     _newDeath = false;
@@ -189,15 +189,15 @@ namespace AmongUsDiscordIntegration {
         }
 
         private void CheckPlayers() {
-            if (!_gameState.Equals(GameState.IN_GAME)) {
+            if (!_gameState.Equals(GameState.InGame)) {
                 return;
             }
             
             var checkedPlayers = new List<string>();
             
             foreach (var playerData in GetAllPlayers()) {
-                var playerName = Utils.ReadString(playerData.PlayerInfo.Value.PlayerName);
-                var currentState = playerData.PlayerInfo.Value.IsDead == 1;
+                var playerName = Utils.ReadString(playerData.PlayerInfo.PlayerName);
+                var currentState = playerData.PlayerInfo.IsDead == 1;
                     
                 checkedPlayers.Add(playerName);
 
@@ -218,7 +218,7 @@ namespace AmongUsDiscordIntegration {
                             Console.WriteLine($"Player {playerName} has died");
                             
                             _httpClient.SendPlayerDeathRequest(playerName);
-                        } else if (playerData.IsLocalPlayer) {
+                        } else if (playerData.IsLocalPlayer()) {
                             Console.WriteLine($"Player {playerName} has died");
                             
                             _isDead = true;
@@ -256,7 +256,7 @@ namespace AmongUsDiscordIntegration {
 
         private void CheckMeeting() {
             if (!GetMeetingHud(out var meetingHud) || meetingHud.Equals(null) || !meetingHud.DespawnOnDestroy) {
-                if (_inMeeting && _gameState.Equals(GameState.IN_GAME)) {
+                if (_inMeeting && _gameState.Equals(GameState.InGame)) {
                     Console.WriteLine("Meeting Ended!");
 
                     _inMeeting = false;
@@ -268,6 +268,8 @@ namespace AmongUsDiscordIntegration {
                         _httpClient.SendMeetingEndRequest();
                     } else if (_isDead) {
                         if (_isMuted) {
+                            // Wait a bit before unmuting dead players, to prevent alive players hearing them
+                            Thread.Sleep(OverlapWaitTime);
                             ToggleMute();
                         }
                     } else {
@@ -282,7 +284,7 @@ namespace AmongUsDiscordIntegration {
                 return;
             }
 
-            if (!_inMeeting  && (meetingHud.state == 0 || meetingHud.state == 1) && _gameState.Equals(GameState.IN_GAME)) {
+            if (!_inMeeting  && (meetingHud.state == 0 || meetingHud.state == 1) && _gameState.Equals(GameState.InGame)) {
                 Console.WriteLine("Meeting Called!");
 
                 _inMeeting = true;
@@ -298,6 +300,9 @@ namespace AmongUsDiscordIntegration {
 
                     ToggleMute();
                 } else {
+                    // Wait a bit before undeafening alive players, to prevent them hearing dead players
+                    Thread.Sleep(OverlapWaitTime);
+                    
                     ToggleDeafen();
                 }
             }
@@ -314,7 +319,7 @@ namespace AmongUsDiscordIntegration {
                 if (playerInfoBytes != null && playerInfoBytes.Length != 0) {
                     var playerInfo = Utils.FromBytes<PlayerInfo>(playerInfoBytes);
 
-                    if (GetLocalPLayer().Instance.PlayerId == playerInfo.PlayerId) {
+                    if (GetLocalPLayer().PlayerControl.PlayerId == playerInfo.PlayerId) {
                         // Local player was exiled (voted-off)
                         _votedOff = true;
                     }
@@ -326,7 +331,7 @@ namespace AmongUsDiscordIntegration {
             var datas = new List<PlayerData>();
 
             // Find player pointer
-            var playerAoB = Mem.ReadBytes(Offset.PlayerControl_Pointer, Utils.SizeOf<PlayerControl>());
+            var playerAoB = Mem.ReadBytes(Offset.PlayerControlPointer, Utils.SizeOf<PlayerControl>());
             
             // Create AOB pattern
             var aobData = "";
@@ -350,11 +355,10 @@ namespace AmongUsDiscordIntegration {
                 
                 // Filter garbage instance datas
                 if (playerControl.SpawnFlags == 257 && playerControl.NetId < uint.MaxValue - 10000) {
-                    datas.Add(new PlayerData {
-                        Instance = playerControl,
-                        offset_str = x.GetAddress(),
-                        offset_ptr = new IntPtr((int) x)
-                    });
+                    datas.Add(new PlayerData(
+                        playerControl, 
+                        new IntPtr((int) x)
+                    ));
                 }
             }
             
@@ -363,7 +367,7 @@ namespace AmongUsDiscordIntegration {
 
         private PlayerData GetLocalPLayer() {
             foreach (PlayerData playerData in GetAllPlayers()) {
-                if (playerData.IsLocalPlayer) {
+                if (playerData.IsLocalPlayer()) {
                     return playerData;
                 }
             }
@@ -371,8 +375,8 @@ namespace AmongUsDiscordIntegration {
             return null;
         }
 
-        private bool GetAmongUsClient(out AmongUsClient client) {
-            var amongUsClientAddress = Utils.GetPointerAddress(Offset.AmongUsClient_Pointer, Offset.AmongUsClient_Offsets);
+        private static bool GetAmongUsClient(out AmongUsClient client) {
+            var amongUsClientAddress = Utils.GetPointerAddress(Offset.AmongUsClientPointer, Offset.AmongUsClientOffsets);
 
             if (amongUsClientAddress == null) {
                 client = new AmongUsClient();
@@ -390,8 +394,8 @@ namespace AmongUsDiscordIntegration {
             return true;
         }
 
-        private bool GetShipStatus(out ShipStatus shipStatus) {
-            var shipStatusAddress = Utils.GetPointerAddress(Offset.ShipStatus_Pointer, Offset.ShipStatus_Offsets);
+        private static bool GetShipStatus(out ShipStatus shipStatus) {
+            var shipStatusAddress = Utils.GetPointerAddress(Offset.ShipStatusPointer, Offset.ShipStatusOffsets);
 
             if (shipStatusAddress == null) {
                 shipStatus = new ShipStatus();
@@ -409,8 +413,8 @@ namespace AmongUsDiscordIntegration {
             return true;
         }
         
-        private bool GetMeetingHud(out MeetingHud meetingHud) {
-            var meetingHudAddress = Utils.GetPointerAddress(Offset.MeetingHud_Pointer, Offset.MeetingHud_Offsets);
+        private static bool GetMeetingHud(out MeetingHud meetingHud) {
+            var meetingHudAddress = Utils.GetPointerAddress(Offset.MeetingHudPointer, Offset.MeetingHudOffsets);
 
             if (meetingHudAddress == null) {
                 meetingHud = new MeetingHud();
@@ -456,10 +460,10 @@ namespace AmongUsDiscordIntegration {
         }
 
         private enum GameState {
-            MENU = 0,
-            LOBBY = 1,
-            IN_GAME = 2,
-            END_SCREEN = 3
+            Menu = 0,
+            Lobby = 1,
+            InGame = 2,
+            EndScreen = 3
         }
         
     }

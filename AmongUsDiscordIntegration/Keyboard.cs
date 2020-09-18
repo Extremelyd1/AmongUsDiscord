@@ -4,20 +4,24 @@ using System.Runtime.InteropServices;
 
 namespace AmongUsDiscordIntegration {
     internal class Keyboard {
-        public ArrayList keysDown = new ArrayList();
+        private readonly ArrayList _keysDown = new ArrayList();
 
         public Keyboard() {
         }
 
         private void Send(Input key, KEYEVENTF flag) {
             INPUT[] inputs = new INPUT[1];
-            INPUT input = new INPUT();
-            input.type = 1; // 1 = Keyboard Input
-            input.ki.wScan = 0;
-            input.ki.time = 0;
-            input.ki.dwExtraInfo = IntPtr.Zero;
-            input.ki.wVk = key;
-            input.ki.dwFlags = flag;
+            INPUT input = new INPUT {
+                type = 1,
+                ki = {
+                    wScan = 0,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero,
+                    wVk = key,
+                    dwFlags = flag
+                }
+            };
+            // 1 = Keyboard Input
             inputs[0] = input;
             SendInput(1, inputs, INPUT.Size);
         }
@@ -25,17 +29,17 @@ namespace AmongUsDiscordIntegration {
         public void SendDown(Input key) {
             Send(key, 0);
 
-            keysDown.Add(key);
+            _keysDown.Add(key);
         }
 
         public void SendUp(Input key) {
             Send(key, KEYEVENTF.KEYUP);
 
-            keysDown.Remove(key);
+            _keysDown.Remove(key);
         }
 
         public bool IsKeyDown(Input key) {
-            return keysDown.Contains(key);
+            return _keysDown.Contains(key);
         }
 
         /// <summary>
@@ -51,7 +55,7 @@ namespace AmongUsDiscordIntegration {
 
         // Declare the INPUT struct
         [StructLayout(LayoutKind.Explicit)]
-        public struct INPUT {
+        private struct INPUT {
             [FieldOffset(0)] public uint type;
             [FieldOffset(4)] public MOUSEINPUT mi;
             [FieldOffset(4)] public KEYBDINPUT ki;

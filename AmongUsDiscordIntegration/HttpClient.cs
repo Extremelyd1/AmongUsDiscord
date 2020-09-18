@@ -6,12 +6,12 @@ using System.Text;
 
 namespace AmongUsDiscordIntegration {
     public class HttpClient {
-        private string ip;
-        private string port;
+        private readonly string _ip;
+        private readonly string _port;
 
         public HttpClient(string ip, string port) {
-            this.ip = ip;
-            this.port = port;
+            _ip = ip;
+            _port = port;
         }
 
         private string SendGetRequest(string url) {
@@ -20,11 +20,17 @@ namespace AmongUsDiscordIntegration {
                 request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
                 request.PreAuthenticate = true;
 
-                using (var response = (HttpWebResponse) request.GetResponse())
-                using (var stream = response.GetResponseStream())
-                using (var reader = new StreamReader(stream)) {
-                    return reader.ReadToEnd();
+                using var response = (HttpWebResponse) request.GetResponse();
+                using var stream = response.GetResponseStream();
+                
+                if (stream == null) {
+                    Console.WriteLine("The request has no response");
+                    return "";
                 }
+                
+                using var reader = new StreamReader(stream);
+                
+                return reader.ReadToEnd();
             }
             catch (Exception) {
                 Console.WriteLine("The request gave an error!");
@@ -46,15 +52,21 @@ namespace AmongUsDiscordIntegration {
                 requestBody.Write(dataBytes, 0, dataBytes.Length);
             }
 
-            using (var response = (HttpWebResponse) request.GetResponse())
-            using (var stream = response.GetResponseStream())
-            using (var reader = new StreamReader(stream)) {
-                return reader.ReadToEnd();
+            using var response = (HttpWebResponse) request.GetResponse();
+            using var stream = response.GetResponseStream();
+                
+            if (stream == null) {
+                Console.WriteLine("The request has no response");
+                return "";
             }
+                
+            using var reader = new StreamReader(stream);
+                
+            return reader.ReadToEnd();
         }
 
         private string GetBaseUrl() {
-            return $"http://{ip}:{port}/among-us/";
+            return $"http://{_ip}:{_port}/among-us/";
         }
 
         public string SendStartRequest(List<string> playerNames) {
