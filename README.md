@@ -15,7 +15,7 @@ More specifically, this program is made for Windows, thus mobile Discord/Among U
 - Go to the [releases page](https://github.com/Extremelyd1/AmongUsDiscord/releases) and download the latest `Launcher.exe`.
 - Go to Discord -> User Settings -> Keybinds, and create new keybinds for the following:
     - A keybind with Action `Toggle Mute` on keys `CTRL + F1`
-    - A keybind with Action `Toggle Deafen` on keys `CTRL + F1`
+    - A keybind with Action `Toggle Deafen` on keys `CTRL + F2`
 - Run the `Launcher.exe` (with administrative rights if asked), and voila!
  
 The program will automatically launch Among Us if it is not running yet. 
