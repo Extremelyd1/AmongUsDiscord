@@ -18,9 +18,11 @@ More specifically, this application is made for Windows, thus mobile Discord/Amo
 - Go to Discord -> User Settings -> Keybinds, and create new keybinds for the following:
     - A keybind with Action `Toggle Mute` on keys `CTRL + F1`
     - A keybind with Action `Toggle Deafen` on keys `CTRL + F2`
+- Make sure that you are not muted nor deafened in Discord before running the launcher.
 - Run the `Launcher.exe` (with administrative rights if asked), and voila!
  
-The application will automatically launch Among Us if it is not running yet. 
+The application will automatically launch Among Us if it is not running yet.
+Also muting or deafening manually in Discord while the application is running might desync it, so be careful.
  
 Note that the application might not run if you don't have `.NETFramework v4.7.2` installed. If the application does not start or gives an error, please check this first.
 
