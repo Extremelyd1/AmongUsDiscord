@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 
 namespace AmongUsDiscordIntegration {
@@ -109,8 +110,6 @@ namespace AmongUsDiscordIntegration {
             Console.WriteLine("\rAmong Us Process found, starting program loop now...");
 
             Mem.OpenProcess(AmongUsProcessName);
-
-            Methods.Init();
             
             var proc = Process.GetProcessesByName(AmongUsProcessName)[0];
             ProcessMemory = new ProcessMemory(proc);
@@ -200,17 +199,17 @@ namespace AmongUsDiscordIntegration {
                 var currentState = playerData.PlayerInfo.IsDead == 1;
                     
                 checkedPlayers.Add(playerName);
-
+            
                 if (!_lastPlayerAliveState.ContainsKey(playerName)) {
                     _lastPlayerAliveState.Add(playerName, currentState);
                         
                     continue;
                 }
-
+            
                 if (!_lastPlayerAliveState.TryGetValue(playerName, out var lastState)) {
                     continue;
                 }
-
+            
                 if (currentState != lastState) {
                         
                     if (currentState) {
@@ -219,7 +218,7 @@ namespace AmongUsDiscordIntegration {
                             
                             _httpClient.SendPlayerDeathRequest(playerName);
                         } else if (playerData.IsLocalPlayer()) {
-                            Console.WriteLine($"Player {playerName} has died");
+                            Console.WriteLine("You have died");
                             
                             _isDead = true;
                             _newDeath = !_votedOff;
@@ -236,7 +235,7 @@ namespace AmongUsDiscordIntegration {
             }
                 
             var playerNamesNotInGame = new List<string>();
-
+            
             foreach (var playerName in _lastPlayerAliveState.Keys) {
                 if (!checkedPlayers.Contains(playerName)) {
                     playerNamesNotInGame.Add(playerName);
@@ -245,9 +244,9 @@ namespace AmongUsDiscordIntegration {
                 
             foreach (var playerName in playerNamesNotInGame) {
                 _lastPlayerAliveState.Remove(playerName);
-
+            
                 Console.WriteLine($"Player {playerName} has left the game");
-
+            
                 if (_useHttp) {
                     _httpClient.SendPlayerDeathRequest(playerName);
                 }
@@ -330,36 +329,40 @@ namespace AmongUsDiscordIntegration {
         private List<PlayerData> GetAllPlayers() {
             var datas = new List<PlayerData>();
 
-            // Find player pointer
-            var playerAoB = Mem.ReadBytes(Offset.PlayerControlPointer, Utils.SizeOf<PlayerControl>());
-            
-            // Create AOB pattern
-            var aobData = "";
-            // Read 4 bytes for AOB pattern
-            for (var i = 0; i < 4; i++) {
-                aobData += playerAoB[i].ToString("X2") + " ";
+            var allPlayersAddress = Utils.GetPointerAddress(Offset.AllPlayersPointer, Offset.AllPlayersOffsets);
+
+            if (allPlayersAddress == null) {
+                return datas;
             }
-        
-            aobData += "?? ?? ?? ??";
 
-            //Console.WriteLine("AOB scan string: " + aobData);
+            var allPlayersArray = Mem.ReadInt(allPlayersAddress);
+
+            var arraySize = Mem.ReadInt(allPlayersArray.ToString("X") + "+C");
+
+            var itemStart = Mem.ReadInt(allPlayersArray.ToString("X") + "+8");
             
-            // Get result 
-            var result = Mem.AoBScan(aobData, true);
-            result.Wait();
-
-            var results = result.Result;
-            foreach (var x in results) {
-                var bytes = Mem.ReadBytes(x.GetAddress(), Utils.SizeOf<PlayerControl>());
-                var playerControl = Utils.FromBytes<PlayerControl>(bytes);
+            for (var i = 0; i < arraySize; i++) {
+                var itemAddress = itemStart + 16 + 4 * i;
                 
-                // Filter garbage instance datas
-                if (playerControl.SpawnFlags == 257 && playerControl.NetId < uint.MaxValue - 10000) {
-                    datas.Add(new PlayerData(
-                        playerControl, 
-                        new IntPtr((int) x)
-                    ));
+                var playerInfoAddress = Mem.ReadInt(itemAddress.ToString("X"));
+
+                var playerInfoBytes = Mem.ReadBytes(
+                    playerInfoAddress.ToString("X"), 
+                    Utils.SizeOf<PlayerInfo>()
+                );
+
+                var playerInfo = Utils.FromBytes<PlayerInfo>(playerInfoBytes);
+
+                if (playerInfo._object == IntPtr.Zero || playerInfo.PlayerName == IntPtr.Zero) {
+                    continue;
                 }
+                
+                var playerControl = Utils.FromBytes<PlayerControl>(Program.Mem.ReadBytes(
+                    ((int) playerInfo._object).ToString("X"),
+                    Utils.SizeOf<PlayerControl>()
+                ));
+                
+                datas.Add(new PlayerData(playerInfo, playerControl));
             }
             
             return datas;
@@ -435,10 +438,10 @@ namespace AmongUsDiscordIntegration {
         private void ToggleMute() {
             _keyboard.SendDown(Keyboard.Input.CONTROL);
             _keyboard.SendDown(Keyboard.Input.F1);
-
+            
             _keyboard.SendUp(Keyboard.Input.F1);
             _keyboard.SendUp(Keyboard.Input.CONTROL);
-
+            
             if (_isDeafened) {
                 _isDeafened = false;
                 _isMuted = false;
@@ -455,7 +458,7 @@ namespace AmongUsDiscordIntegration {
             
             _keyboard.SendUp(Keyboard.Input.F2);
             _keyboard.SendUp(Keyboard.Input.CONTROL);
-
+            
             _isDeafened = !_isDeafened;
         }
 

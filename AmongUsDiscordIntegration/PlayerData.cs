@@ -2,43 +2,17 @@
 
 namespace AmongUsDiscordIntegration {
     public class PlayerData {
+        private readonly PlayerInfo _playerInfo;
         private readonly PlayerControl _playerControl;
-        private readonly IntPtr _playerControlOffsetPtr;
 
-        private bool _playerInfoCached;
-        private string _playerInfoOffset;
-
-        public PlayerData(PlayerControl playerControl, IntPtr offsetPtr) {
+        public PlayerData(PlayerInfo playerInfo, PlayerControl playerControl) {
+            _playerInfo = playerInfo;
             _playerControl = playerControl;
-            _playerControlOffsetPtr = offsetPtr;
-
-            _playerInfoCached = false;
         }
 
         public PlayerControl PlayerControl => _playerControl;
 
-        public PlayerInfo PlayerInfo {
-            get {
-                PlayerInfo playerInfo;
-                
-                if (!_playerInfoCached) {
-                    var ptr = Methods.CallPlayerControlGetData(_playerControlOffsetPtr);
-                    _playerInfoOffset = ptr.GetAddress();
-                    playerInfo =
-                        Utils.FromBytes<PlayerInfo>(
-                            Program.Mem.ReadBytes(_playerInfoOffset, Utils.SizeOf<PlayerInfo>()));
-
-                    _playerInfoCached = true;
-                } else {
-                    playerInfo = Utils.FromBytes<PlayerInfo>(
-                        Program.Mem.ReadBytes(_playerInfoOffset,
-                        Utils.SizeOf<PlayerInfo>())
-                    );
-                }
-
-                return playerInfo;
-            }
-        }
+        public PlayerInfo PlayerInfo => _playerInfo;
         
         public bool IsLocalPlayer() {
             return _playerControl.myLight != IntPtr.Zero;

@@ -120,11 +120,14 @@ namespace AmongUsDiscordIntegration {
                 }
 
                 if (i == offsets.Length - 1) {
-                    return offsetAddress;
+                    var longAddress = 
+                        Convert.ToInt64(offsetAddress,16) + Convert.ToInt64(offsets[i],16);
+                    
+                    return longAddress.ToString("X");
                 }
 
                 offsetAddress = offsetAddress + "+" + offsets[i];
-
+                
                 currentReadBytes = Program.Mem.ReadBytes(offsetAddress, 4);
 
                 if (currentReadBytes == null || currentReadBytes.Length == 0) {
