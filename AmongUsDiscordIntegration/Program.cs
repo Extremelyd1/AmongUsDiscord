@@ -31,6 +31,7 @@ namespace AmongUsDiscordIntegration {
         private bool _newDeath;
 
         private bool _votedOff;
+        private bool _voteCausesEnd;
 
         private readonly Dictionary<string, bool> _lastPlayerAliveState;
 
@@ -54,6 +55,7 @@ namespace AmongUsDiscordIntegration {
             _newDeath = false;
 
             _votedOff = false;
+            _voteCausesEnd = true;
 
             _lastPlayerAliveState = new Dictionary<string, bool>();
         }
@@ -177,6 +179,7 @@ namespace AmongUsDiscordIntegration {
                     _isDead = false;
                     _newDeath = false;
                     _votedOff = false;
+                    _voteCausesEnd = false;
                     
                     if (_isDeafened || _isMuted) {
                         ToggleMute();
@@ -264,18 +267,27 @@ namespace AmongUsDiscordIntegration {
                     Thread.Sleep(MeetingEndWaitTime);
                     
                     if (_useHttp) {
-                        _httpClient.SendMeetingEndRequest();
+                        if (!_voteCausesEnd) {
+                            // Don't send a meeting end request if game is going to end, to prevent extra requests
+                            _httpClient.SendMeetingEndRequest();
+                        }
                     } else if (_isDead) {
                         if (_isMuted) {
-                            // Wait a bit before unmuting dead players, to prevent alive players hearing them
-                            Thread.Sleep(OverlapWaitTime);
+                            if (!_voteCausesEnd) {
+                                // Wait a bit before unmuting dead players, to prevent alive players hearing them
+                                // Don't have to wait if this meeting vote causes end
+                                Thread.Sleep(OverlapWaitTime);
+                            }
+
                             ToggleMute();
                         }
                     } else {
-                        if (!_votedOff) {
-                            ToggleDeafen();
-                        } else {
-                            Console.WriteLine("Local player was voted off, not deafening");
+                        if (!_voteCausesEnd) {
+                            if (!_votedOff) {
+                                ToggleDeafen();
+                            } else {
+                                Console.WriteLine("Local player was voted off, not deafening");
+                            }
                         }
                     }
                 }
@@ -312,15 +324,39 @@ namespace AmongUsDiscordIntegration {
                     return;
                 }
 
-                var exiledPlayer = ((int) meetingHud.exiledPlayer).ToString("X");
+                var exiledPlayerAddress = ((int) meetingHud.exiledPlayer).ToString("X");
                 
-                var playerInfoBytes = Mem.ReadBytes(exiledPlayer, Utils.SizeOf<PlayerInfo>());
-                if (playerInfoBytes != null && playerInfoBytes.Length != 0) {
-                    var playerInfo = Utils.FromBytes<PlayerInfo>(playerInfoBytes);
+                var exiledPlayerBytes = Mem.ReadBytes(exiledPlayerAddress, Utils.SizeOf<PlayerInfo>());
+                if (exiledPlayerBytes != null && exiledPlayerBytes.Length != 0) {
+                    var exiledPlayer = Utils.FromBytes<PlayerInfo>(exiledPlayerBytes);
 
-                    if (GetLocalPLayer().PlayerControl.PlayerId == playerInfo.PlayerId) {
+                    if (GetLocalPLayer().PlayerInfo.PlayerId == exiledPlayer.PlayerId) {
                         // Local player was exiled (voted-off)
                         _votedOff = true;
+                    } else {
+                        // Check whether this vote causes the game to end
+                        var players = GetAllPlayers();
+
+                        var crewCount = 0;
+                        var imposterCount = 0;
+                        
+                        foreach (var player in players) {
+                            // Skip dead and exiled players
+                            if (player.PlayerInfo.PlayerId == exiledPlayer.PlayerId 
+                                || player.PlayerInfo.IsDead == 1) {
+                                continue;
+                            }
+
+                            if (player.PlayerInfo.IsImpostor == 1) {
+                                imposterCount++;
+                            } else {
+                                crewCount++;
+                            }
+                        }
+
+                        if (imposterCount == 0 || imposterCount >= crewCount) {
+                            _voteCausesEnd = true;
+                        }
                     }
                 }
             }
