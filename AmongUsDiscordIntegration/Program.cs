@@ -359,10 +359,18 @@ namespace AmongUsDiscordIntegration {
                 return;
             }
 
-            // If the last exile state was true, and now it is false, we ended the meeting
-            if (!newExileState && _lastExileState) {
-                // Sanity check, are we currently in a game and in a meeting?
-                if (!_inMeeting || !_gameState.Equals(GameState.InGame)) {
+            if (newExileState != _lastExileState) {
+                Console.WriteLine($"ExileController is active, state is {newExileState}, old state {_lastExileState}");
+            }
+
+            // If the exile state changed
+            if (newExileState != _lastExileState) {
+                // Update last exile state
+                _lastExileState = newExileState;
+                
+                // Check whether the exile state is now false, meaning ExileController is finished
+                // And sanity checks
+                if (newExileState || !_inMeeting || !_gameState.Equals(GameState.InGame)) {
                     return;
                 }
                 
@@ -395,9 +403,6 @@ namespace AmongUsDiscordIntegration {
                     }
                 }
             }
-            
-            // Updating last exile state
-            _lastExileState = newExileState;
         }
 
         private bool CheckValidMeeting(out MeetingHud meetingHud) {
