@@ -16,5 +16,8 @@
 
         public const string MeetingHudPointer = "GameAssembly.dll+DA58D0";
         public static readonly string[] MeetingHudOffsets = {"5C", "0", "0"};
+
+        public const string ExileControllerPointer = "GameAssembly.dll+DA5380";
+        public static readonly string[] ExileControllerOffsets = {"5C", "0", "0"};
     }
 }
