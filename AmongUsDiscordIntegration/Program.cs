@@ -183,8 +183,12 @@ namespace AmongUsDiscordIntegration {
                     _newDeath = false;
                     _votedOff = false;
                     _voteCausesEnd = false;
-                    
-                    if (_isDeafened || _isMuted) {
+
+                    if (_useHttp) {
+                        if (_gameState.Equals(GameState.InGame)) {
+                            _httpClient.SendEndRequest();
+                        }
+                    } else if (_isDeafened || _isMuted) {
                         ToggleMute();
                     }
                 }
@@ -202,6 +206,19 @@ namespace AmongUsDiscordIntegration {
             
             foreach (var playerData in GetAllPlayers()) {
                 var playerName = Utils.ReadString(playerData.PlayerInfo.PlayerName);
+                
+                if (playerData.PlayerInfo.Disconnected == 1) {
+                    // Player disconnected from game, remove from list
+                    _lastPlayerAliveState.Remove(playerName);
+
+                    if (_useHttp) {
+                        // Send a death request for this player
+                        _httpClient.SendPlayerDeathRequest(playerName);
+                    }
+
+                    return;
+                }
+                
                 var currentState = playerData.PlayerInfo.IsDead == 1;
                     
                 checkedPlayers.Add(playerName);
@@ -221,8 +238,14 @@ namespace AmongUsDiscordIntegration {
                     if (currentState) {
                         if (_useHttp) {
                             Console.WriteLine($"Player {playerName} has died");
-                            
-                            _httpClient.SendPlayerDeathRequest(playerName);
+
+                            // If player was voted off, then skip the death request, because we already send it
+                            if (!_votedOff) {
+                                _httpClient.SendPlayerDeathRequest(playerName);
+                            } else {
+                                // Reset the voted off variable for the next exiled player
+                                _votedOff = false;
+                            }
                         } else if (playerData.IsLocalPlayer()) {
                             Console.WriteLine("You have died");
                             
@@ -323,33 +346,42 @@ namespace AmongUsDiscordIntegration {
             if (exiledPlayerBytes != null && exiledPlayerBytes.Length != 0) {
                 var exiledPlayer = Utils.FromBytes<PlayerInfo>(exiledPlayerBytes);
 
-                if (GetLocalPLayer().PlayerInfo.PlayerId == exiledPlayer.PlayerId) {
+                if (_useHttp) {
+                    // Already send a death request for the exiled player
+                    var playerName = Utils.ReadString(exiledPlayer.PlayerName);
+
+                    Console.WriteLine($"Player {playerName} was voted off");
+
+                    _httpClient.SendPlayerDeathRequest(playerName);
+
+                    _votedOff = true;
+                } else if (GetLocalPLayer().PlayerInfo.PlayerId == exiledPlayer.PlayerId) {
                     // Local player was exiled (voted-off)
                     _votedOff = true;
-                } else {
-                    // Check whether this vote causes the game to end
-                    var players = GetAllPlayers();
+                }
+                
+                // Check whether this vote causes the game to end
+                var players = GetAllPlayers();
 
-                    var crewCount = 0;
-                    var imposterCount = 0;
-                        
-                    foreach (var player in players) {
-                        // Skip dead and exiled players
-                        if (player.PlayerInfo.PlayerId == exiledPlayer.PlayerId 
-                            || player.PlayerInfo.IsDead == 1) {
-                            continue;
-                        }
-
-                        if (player.PlayerInfo.IsImpostor == 1) {
-                            imposterCount++;
-                        } else {
-                            crewCount++;
-                        }
+                var crewCount = 0;
+                var imposterCount = 0;
+                    
+                foreach (var player in players) {
+                    // Skip dead and exiled players
+                    if (player.PlayerInfo.PlayerId == exiledPlayer.PlayerId 
+                        || player.PlayerInfo.IsDead == 1) {
+                        continue;
                     }
 
-                    if (imposterCount == 0 || imposterCount >= crewCount) {
-                        _voteCausesEnd = true;
+                    if (player.PlayerInfo.IsImpostor == 1) {
+                        imposterCount++;
+                    } else {
+                        crewCount++;
                     }
+                }
+
+                if (imposterCount == 0 || imposterCount >= crewCount) {
+                    _voteCausesEnd = true;
                 }
             }
         }
@@ -357,10 +389,6 @@ namespace AmongUsDiscordIntegration {
         private void CheckExileController() {
             if (!GetExileControllerActive(out var newExileState)) {
                 return;
-            }
-
-            if (newExileState != _lastExileState) {
-                Console.WriteLine($"ExileController is active, state is {newExileState}, old state {_lastExileState}");
             }
 
             // If the exile state changed
