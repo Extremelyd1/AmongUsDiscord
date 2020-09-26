@@ -7,8 +7,10 @@ using System.Threading;
 namespace AmongUsDiscordIntegration {
     public class Program {
         private const string AmongUsProcessName = "Among Us";
-        private const string Ip = "192.168.2.200";
-        private const string Port = "7919";
+        // private const string Ip = "192.168.2.200";
+        // private const string Port = "7919";
+        private const string Ip = "localhost";
+                private const string Port = "12345";
 
         private const int OverlapWaitTime = 1000;
 
@@ -206,17 +208,21 @@ namespace AmongUsDiscordIntegration {
             
             foreach (var playerData in GetAllPlayers()) {
                 var playerName = Utils.ReadString(playerData.PlayerInfo.PlayerName);
-                
-                if (playerData.PlayerInfo.Disconnected == 1) {
-                    // Player disconnected from game, remove from list
-                    _lastPlayerAliveState.Remove(playerName);
 
-                    if (_useHttp) {
-                        // Send a death request for this player
-                        _httpClient.SendPlayerDeathRequest(playerName);
+                if (playerData.PlayerInfo.Disconnected == 1) {
+                    if (_lastPlayerAliveState.ContainsKey(playerName)) {
+                        // Player disconnected from game, remove from list
+                        _lastPlayerAliveState.Remove(playerName);
+
+                        Console.WriteLine($"Player {playerName} has left the game, disconnected");
+
+                        if (_useHttp) {
+                            // Send a death request for this player
+                            _httpClient.SendPlayerDeathRequest(playerName);
+                        }
                     }
 
-                    return;
+                    continue;
                 }
                 
                 var currentState = playerData.PlayerInfo.IsDead == 1;
