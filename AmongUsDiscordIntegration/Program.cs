@@ -7,10 +7,8 @@ using System.Threading;
 namespace AmongUsDiscordIntegration {
     public class Program {
         private const string AmongUsProcessName = "Among Us";
-        // private const string Ip = "192.168.2.200";
-        // private const string Port = "7919";
-        private const string Ip = "localhost";
-                private const string Port = "12345";
+        private const string Ip = "192.168.2.200";
+        private const string Port = "7919";
 
         private const int OverlapWaitTime = 1000;
 
@@ -519,25 +517,6 @@ namespace AmongUsDiscordIntegration {
             return true;
         }
 
-        private static bool GetShipStatus(out ShipStatus shipStatus) {
-            var shipStatusAddress = Utils.GetPointerAddress(Offset.ShipStatusPointer, Offset.ShipStatusOffsets);
-
-            if (shipStatusAddress == null) {
-                shipStatus = new ShipStatus();
-                return false;
-            }
-            
-            var shipStatusBytes = Mem.ReadBytes(shipStatusAddress, Utils.SizeOf<ShipStatus>());
-
-            if (shipStatusBytes == null || shipStatusBytes.Length == 0) {
-                shipStatus = new ShipStatus();
-                return false;
-            }
-            
-            shipStatus = Utils.FromBytes<ShipStatus>(shipStatusBytes);
-            return true;
-        }
-        
         private static bool GetMeetingHud(out MeetingHud meetingHud) {
             var meetingHudAddress = Utils.GetPointerAddress(Offset.MeetingHudPointer, Offset.MeetingHudOffsets);
 
@@ -562,7 +541,7 @@ namespace AmongUsDiscordIntegration {
             
             var exileControllerAddress =
                 Utils.GetPointerAddress(Offset.ExileControllerPointer, Offset.ExileControllerOffsets);
-
+            
             if (exileControllerAddress == null) {
                 return false;
             }
