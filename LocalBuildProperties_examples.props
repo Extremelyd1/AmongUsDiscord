@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <!-- Fill in your path to the Among Us game files, for example: "[steam]\steamapps\common\Among Us" -->
+        <AmongUs></AmongUs>
+    </PropertyGroup>
+</Project>

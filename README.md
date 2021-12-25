@@ -1,32 +1,30 @@
 # Among Us Discord
-A tool to handle discord muting/deafening for Among Us
+A partial integration to handle discord muting/deafening for the game Among Us.
 
 ## What is Among Us Discord
-Among Us Discord is a user-application that runs on your computer.
-It's goal is to provide an immersive experience when playing with a group that is in a Discord call.
-It accomplishes this by muting/deafening the user at appropriate moments by programatically pressing keybinds.
-Namely, all users (running this application) are muted and deafened at the start of the game.
-Users are only unmuted and undeafened if they are still alive when a meeting is called.
-After a meeting, all alive players are muted and deafened again to allow dead players to speak among themselves.
-
-Unfortunately, the idea behind this application only works if everyone who plays uses it.
+Among Us Discord is a BepInEx plugin for Among Us.
+Its goal is to provide an immersive experience when playing with a group that is in a Discord call.
+It accomplishes this by sending game-related events over HTTP to a webserver.
+This application can then be coupled with a Discord bot that handles muting/deafening members based on these events.
 
 ## Usage
-This tool only works if you run Discord and the game Among Us on the same device.
-More specifically, this application is made for Windows, thus mobile Discord/Among Us users are not supported.
-- Go to the [releases page](https://github.com/Extremelyd1/AmongUsDiscord/releases) and download the latest `Launcher.exe`.
-- Go to Discord -> User Settings -> Keybinds, and create new keybinds for the following:
-    - A keybind with Action `Toggle Mute` on keys `CTRL + F1`
-    - A keybind with Action `Toggle Deafen` on keys `CTRL + F2`
-- Make sure that you are not muted nor deafened in Discord before running the launcher.
-- Run the `Launcher.exe` (with administrative rights if asked), and voila!
- 
-The application will automatically launch Among Us if it is not running yet.
-Also muting or deafening manually in Discord while the application is running might desync it, so be careful.
- 
-Note that the application might not run if you don't have `.NETFramework v4.7.2` installed. If the application does not start or gives an error, please check this first.
+Since this is a plugin for BepInEx, you will need to install the BepInEx framework first.
+A guide for this can be found on the [BepInEx documentation](https://docs.bepinex.dev/master/articles/user_guide/installation/unity_il2cpp.html).
 
-## Technical details
+**Note:** The above link refers to the documentation of a unreleased version of BepInEx and might not be accurate in the future.
+As of writing this readme, this is the only documentation on installing the IL2CPP version of BepInEx.  
+
+After installing the BepInEx framework successfully, the [latest release](https://github.com/Extremelyd1/AmongUsDiscord/releases/latest) of this plugin can be put in the BepInEx plugin folder.
+The BepInEx plugin folder should be located relative to your Among Us installation: `[among-us]/BepInEx/plugins`. 
+Running the game with the plugin installed at least once, will generate a config file at `[among-us]/BepInEx/config/AmongUsDiscord.cfg`.
+This config file contains configurable settings for the webserver IP and port to send events to.
+
+## Technical details for v2 and up
+### BepInEx framework
+Due to the use of the BepInEx framework the heavy lifting of hooking methods for game events is handled for us.
+In contrast to v1.10 and below this condenses the codebase to a simple file with patches for methods and a file that manages the HTTP client.
+
+## Technical details for v1.10 and below
 ### Among Us directory location
 The launcher automatically finds the install location of Among Us by finding the main Steam install path from registry.
 This main Steam Library contains a file with entries pertaining to all registered Steam Library locations on disk. 
